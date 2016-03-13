@@ -1,0 +1,3 @@
+--To store full ISBN's in the DB.
+ALTER TABLE product
+ALTER COLUMN pid type bigint; 
