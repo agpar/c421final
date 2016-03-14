@@ -22,8 +22,8 @@ public class Main {
             System.out.println("1. Add a new Book.");
             System.out.println("2. Find a Book.");
             System.out.println("3. Add a new Discount.");
-            System.out.println("4. Submit Restock Order");
-            System.out.println("5. ");
+            System.out.println("4. Submit Restock Order.");
+            System.out.println("5. Daily Sales Manifest.\n");
             System.out.println("6. Quit\n");
             System.out.print("> ");
             choice = scanner.nextInt();
@@ -59,6 +59,10 @@ public class Main {
             else if (choice == 4)
             {
                 restock(con);
+            }
+            else if (choice == 5)
+            {
+                dailySales(con);
             }
         } while (choice != 6);
         con.close();
@@ -112,7 +116,7 @@ public class Main {
         if (!rs.next())
         {
             System.out.println(String.format("Category '%s' does not exist. Create it?", category));
-            System.out.print("[y]/n");
+            System.out.print("[y]/n: ");
             String ans = scanner.nextLine();
             if(ans.contains("n") || ans.contains("N")){}
             else
@@ -195,9 +199,9 @@ public class Main {
 
         //Print results
         int count = 0;
-        System.out.println(String.format("%2s %10s %20s %15s %15s %5s %10s",
-                "Numb.", "PID", "TITLE", "PUBLISHER", "AUTHOR", "QTY", "PRICE"));
-        System.out.println("====================================" +
+        System.out.println(String.format("%6s %10s %20s %15s %15s %5s %10s",
+                "Numb.", "ISBN", "TITLE", "PUBLISHER", "AUTHOR", "QTY", "PRICE"));
+        System.out.println("=======================================" +
                 "==================================================");
 
         while(rs.next())
@@ -209,7 +213,7 @@ public class Main {
             float price = rs.getFloat("price");
             int qty = rs.getInt("qty");
 
-            System.out.println(String.format("%2d:: %10d %20s %15s %15s %5d %10.2f",
+            System.out.println(String.format("%4d:: %10d %20s %15s %15s %5d %10.2f",
                         count, pid, title, publisher, author, qty, price));
             count++;
         }
@@ -217,6 +221,7 @@ public class Main {
         System.out.print("Press Enter to continue.");
         scanner.nextLine();
         System.out.println();
+        stmt.close();
     }
 
     public static void addDisc(Connection con)
@@ -224,10 +229,87 @@ public class Main {
 
     }
 
-    public static void restock(Connection con)
+    public static void restock(Connection con) throws SQLException
     {
+        Statement stmt = con.createStatement();
+        System.out.print("Input employee ID: ");
+        int eid = scanner.nextInt();
+        scanner.nextLine();
 
+        //Check if employee ID exists.
+        String emp_search = String.format(
+                "SELECT * FROM employee " +
+                "WHERE eid=%d", eid);
+        ResultSet rs = stmt.executeQuery(emp_search);
+        if (!rs.next())
+        {
+            System.out.println("Employee ID does not exist.");
+            return;
+        }
+
+        //Check that book exists
+        System.out.print("Input ISBN of book to restock: ");
+        String isbn = scanner.nextLine();
+        long id = normalizeISBN(isbn);
+
+        String book_search = String.format(
+                "SELECT * FROM book " +
+                        "WHERE pid=%d", id);
+        rs = stmt.executeQuery(book_search);
+        if (!rs.next())
+        {
+            System.out.println("Book with this ISBN does not exist.");
+            return;
+        }
+
+        //Find out qty to restock.
+        System.out.print("Order qty: ");
+        int order_qty = scanner.nextInt();
+        scanner.nextLine();
+
+        //Make the restock happen.
+        String restocks = String.format(
+                "INSERT INTO restocks (eid,pid,qty) " +
+                "VALUES (%d, %d, %d)", eid, id, order_qty);
+        stmt.executeUpdate(restocks);
+
+        System.out.println("Submitted restock order on book " + id + ".\n");
+        stmt.close();
     }
+
+    public static void dailySales(Connection con) throws SQLException
+    {
+        String dsq = "SELECT * FROM DAILY_SALES;";
+        Statement stmt = con.createStatement();
+        ResultSet rs = stmt.executeQuery(dsq);
+
+        int total = 0;
+        System.out.println(String.format("%5s %35s %25s %20s %5s %8s %10s",
+                "ISBN", "TITLE", "PUBLISHER", "AUTHOR", "QTY", "SALES","PRICE"));
+        System.out.println("==================================================================" +
+                "==================================================");
+        while(rs.next())
+        {
+            long pid = rs.getLong("pid");
+            String title = rs.getString("title");
+            String publisher = rs.getString("publisher");
+            String author = rs.getString("author");
+            float price = rs.getFloat("price");
+            int qty = rs.getInt("qty");
+            int sales = rs.getInt("sales");
+
+            total += (sales*price);
+
+            System.out.println(String.format("%5d %35s %25s %20s %5d %8d %10.2f",
+                    pid, title, publisher, author, qty, sales, price));
+        }
+        System.out.println();
+        System.out.println("Total sales today: $" + total + ".\n");
+        System.out.println("Press Enter to continue");
+        scanner.nextLine();
+        stmt.close();
+    }
+
     private static long normalizeISBN(String isbn){
         isbn = isbn.replaceAll("[^\\d.]", "");
         return Long.parseLong(isbn);
