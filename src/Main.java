@@ -1,9 +1,13 @@
 import java.sql.*;
+import java.text.ParseException;
 import java.util.Scanner;
-
+import java.util.Date;
+import java.text.SimpleDateFormat;
+import java.lang.StringBuilder;
 
 public class Main {
     static Scanner scanner = new Scanner(System.in);
+    static SimpleDateFormat datefmt = new SimpleDateFormat("yyy-MM-dd");
 
     public static void main(String[] args) throws SQLException
     {
@@ -13,6 +17,7 @@ public class Main {
         con.close();
     }
 
+    //Draws main menu for picking what to do.
     public static void drawMenu(Connection con) throws SQLException
     {
         int choice = 0;
@@ -54,20 +59,45 @@ public class Main {
             }
             else if (choice == 3)
             {
-                addDisc(con);
+                try
+                {
+                    addDisc(con);
+                }
+                catch (SQLException e)
+                {
+                    System.out.println("Failed with error: ");
+                    System.out.println(e);
+                }
             }
             else if (choice == 4)
             {
-                restock(con);
+                try
+                {
+                    restock(con);
+                }
+                catch (SQLException e)
+                {
+                    System.out.println("Failed with error: ");
+                    System.out.println(e);
+                }
             }
             else if (choice == 5)
             {
-                dailySales(con);
+                try
+                {
+                    dailySales(con);
+                }
+                catch (SQLException e)
+                {
+                    System.out.println("Failed with error: ");
+                    System.out.println(e);
+                }
             }
         } while (choice != 6);
         con.close();
     }
 
+    //Draws menu and interactively collects data for adding a book.
     public static void addBook(Connection con) throws SQLException
     {
         String isbn, publisher, author, title, category;
@@ -113,6 +143,7 @@ public class Main {
                         "WHERE name='%s'", category);
         ResultSet rs = stmt.executeQuery(genre_search);
 
+        //Interactively create a Category for the book if the input does not exist.
         if (!rs.next())
         {
             System.out.println(String.format("Category '%s' does not exist. Create it?", category));
@@ -141,8 +172,10 @@ public class Main {
         stmt.close();
     }
 
+    //Interactive book searching.
     public static void findBookMenuItem(Connection con) throws SQLException
     {
+        //Get user preferences for book finding.
         int choice = 0;
         System.out.println("How would you like to search for the book? ");
         do
@@ -194,10 +227,11 @@ public class Main {
             return;
         }
 
+        //Execute select command.
         Statement stmt = con.createStatement();
         ResultSet rs = stmt.executeQuery(cmd);
 
-        //Print results
+        //Print results.
         int count = 0;
         System.out.println(String.format("%6s %10s %20s %15s %15s %5s %10s",
                 "Numb.", "ISBN", "TITLE", "PUBLISHER", "AUTHOR", "QTY", "PRICE"));
@@ -224,11 +258,201 @@ public class Main {
         stmt.close();
     }
 
-    public static void addDisc(Connection con)
+    //Interactive discount creation.
+    public static void addDisc(Connection con) throws SQLException
     {
+        //Gather information for discount user wishes to make.
+        int choice = 0;
+        String searchType, cmd;
+        System.out.println("What would you like to apply a discount to? ");
+        do
+        {
+            System.out.println("1. Single Book.");
+            System.out.println("2. Author's Work.");
+            System.out.println("3. Category.");
+            System.out.println("4. Go back.\n");
+            System.out.print("> ");
+            choice = scanner.nextInt();
+            scanner.nextLine();
+        } while (choice > 4 || choice < 1);
+
+        //Get choice (ISBN, author, category) and confirm it exists.
+        String search_term;
+        if (choice == 1)
+        {
+            System.out.print("ISBN: ");
+            String inpt = scanner.nextLine();
+            search_term = Long.toString(normalizeISBN(inpt));
+            cmd = String.format("SELECT * FROM product " +
+                    "INNER JOIN book ON product.pid = book.pid " +
+                    "WHERE product.pid=%s", search_term);
+            searchType = "ISBN";
+        }
+        else if (choice == 2)
+        {
+            System.out.print("Author: ");
+            search_term = scanner.nextLine();
+            cmd = String.format("SELECT * FROM product " +
+                    "INNER JOIN book ON product.pid = book.pid " +
+                    "WHERE LOWER(author)=LOWER('%s')", search_term);
+            searchType = "Author";
+        }
+        else if (choice == 3)
+        {
+            System.out.print("Category: ");
+            search_term = scanner.nextLine();
+            search_term = search_term.toUpperCase();
+            cmd = String.format("SELECT * FROM category " +
+                    "WHERE category.name='%s'", search_term);
+            searchType = "Category";
+        }
+        else
+        {
+            return;
+        }
+
+        Statement stmt = con.createStatement();
+        ResultSet rs = stmt.executeQuery(cmd);
+        if (!rs.next()) {
+            System.out.println(String.format("%s does not exist.\n", searchType));
+            return;
+        }
+
+        //Get information for discount creation.
+        choice = 0;
+        System.out.println("Discount by percent or dollar amount?");
+        do
+        {
+            System.out.println("1. Percent");
+            System.out.println("2. Dollar Amount");
+            System.out.println("3. Go back.\n");
+            System.out.print("> ");
+            choice = scanner.nextInt();
+            scanner.nextLine();
+        } while (choice > 3 || choice < 1);
+
+        String prct="", amnt="";
+        if (choice == 1)
+        {
+            System.out.print("Percent: ");
+            prct = String.valueOf(scanner.nextInt());
+            scanner.nextLine();
+        }
+        else if(choice == 2)
+        {
+            System.out.print("Amount: ");
+            amnt = String.valueOf(scanner.nextInt());
+            scanner.nextLine();
+        }
+
+        //Get expiry date of Discount (lazily assuming discounts go into effect today.)
+        String expDate = "";
+        Date today = new Date();
+        String today_fmted = datefmt.format(today);
+        while(expDate.isEmpty())
+        {
+            System.out.print("When will discount expire (yyyy-mm-dd)? ");
+            expDate = scanner.nextLine();
+            try
+            {
+                Date expirey = datefmt.parse(expDate);
+                if (expirey.before(today))
+                {
+                    System.out.println("Invalid date. Expiry date must be in the future. \n");
+                    expDate = "";
+                }
+            }
+            catch (ParseException e)
+            {
+                System.out.println("Invalid date. Use yyy-mm-dd format.\n");
+                expDate = "";
+            }
+        }
+
+        //Create the discount.
+        if(prct.isEmpty()) {
+            cmd = String.format("INSERT INTO discount (percent,amount,from_date,to_date) " +
+                    "VALUES (null, %s, '%s', '%s')", amnt, today_fmted, expDate);
+        }
+        else
+        {
+            cmd = String.format("INSERT INTO discount (percent,amount,from_date,to_date) " +
+                    "VALUES (%s, null, '%s', '%s')", prct, today_fmted, expDate);
+        }
+        stmt.executeUpdate(cmd, Statement.RETURN_GENERATED_KEYS);
+        rs = stmt.getGeneratedKeys();
+        rs.next();
+        int did = rs.getInt("did");
+
+
+        //Create and apply discount to single book.
+        if(searchType.equals("ISBN"))
+        {
+            cmd = String.format("INSERT INTO discOnProd (did, pid) " +
+                    "VALUES (%d, %s)",did, search_term );
+            stmt.executeUpdate(cmd);
+
+            cmd = String.format("SELECT * FROM product where pid=%s", search_term);
+            rs = stmt.executeQuery(cmd);
+            rs.next();
+            String title = rs.getString("title");
+            float price = rs.getFloat("price");
+            float new_price;
+
+            if(prct.isEmpty()){
+                new_price = price - Float.valueOf(amnt);
+            }
+            else
+            {
+                new_price = price - (price * (Float.valueOf(prct)/100));
+            }
+
+            System.out.println("Discount created successfully. ");
+            System.out.println(String.format("%s price changed from %.2f to %.2f. \n", title, price, new_price));
+
+        }
+
+        //Create and apply discount to all of an author's books.
+        else if(searchType.equals("Author"))
+        {
+            cmd = String.format("SELECT * FROM product where author='%s'", search_term);
+            rs = stmt.executeQuery(cmd);
+            cmd = "INSERT INTO disconProd (did, pid) " +
+                    "VALUES ";
+            StringBuilder sb = new StringBuilder();
+            sb.append(cmd);
+            int counter = 0;
+
+            while(rs.next())
+            {
+                counter++;
+                int isbn = rs.getInt("pid");
+                if (counter == 1)
+                    sb.append(String.format("(%d, %d)", did, isbn));
+                else
+                    sb.append(String.format(", (%d, %d)", did, isbn));
+
+            }
+
+            cmd = sb.toString();
+            stmt.executeUpdate(cmd);
+            System.out.println(String.format("Applied discount to all %d books by %s.\n", counter, search_term));
+
+        }
+
+        //Create and apply discount to category.
+        else if(searchType.equals("Category"))
+        {
+            cmd = String.format("INSERT INTO discOnCat (did, category) " +
+                    "VALUES (%d, '%s')", did, search_term);
+            stmt.executeUpdate(cmd);
+
+            System.out.println(String.format("Applied discount to all books in %s category.\n", search_term));
+        }
 
     }
 
+    //Interactive Restocking.
     public static void restock(Connection con) throws SQLException
     {
         Statement stmt = con.createStatement();
@@ -247,7 +471,7 @@ public class Main {
             return;
         }
 
-        //Check that book exists
+        //Check that book exists.
         System.out.print("Input ISBN of book to restock: ");
         String isbn = scanner.nextLine();
         long id = normalizeISBN(isbn);
@@ -277,6 +501,7 @@ public class Main {
         stmt.close();
     }
 
+    //Print daily sales.
     public static void dailySales(Connection con) throws SQLException
     {
         String dsq = "SELECT * FROM DAILY_SALES;";

@@ -1,3 +1,8 @@
 --To store full ISBN's in the DB.
 ALTER TABLE product
 ALTER COLUMN pid type bigint; 
+
+
+--To have auto-incrementing discount IDs
+CREATE SEQUENCE discount_serial START WITH [CURRENT MAX];
+ALTER TABLE discount ALTER COLUMN did SET DEFAULT nextval('discount_serial');

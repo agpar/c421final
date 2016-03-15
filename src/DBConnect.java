@@ -7,25 +7,23 @@ public class DBConnect {
     private String DB, USER, PASS;
     private Connection c = null;
 
-    public DBConnect()
-    {
+    public DBConnect() {
         this.DB = this.DEFAULT_DB;
         this.USER = this.DEFAULT_USER;
         this.PASS = this.DEFAULT_PASS;
     }
-    public DBConnect(String DB, String user, String pass)
-    {
+
+    public DBConnect(String DB, String user, String pass) {
         this.DB = DB;
         this.USER = user;
         this.PASS = pass;
     }
 
-    public Connection getConnection() throws SQLException
-    {
-        if (this.c == null || this.c.isClosed())
-        {
+    public Connection getConnection() throws SQLException {
+        if (this.c == null || this.c.isClosed()) {
             String dburl = "jdbc:postgresql://localhost:5432/" + this.DB;
-            this.c = DriverManager.getConnection(dburl, this.USER, this.PASS);
+            this.c = DriverManager
+                    .getConnection(dburl, this.USER, this.PASS);
         }
         return this.c;
     }
