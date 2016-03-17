@@ -206,7 +206,6 @@ public class Main {
                     "WHERE LOWER(publisher)=LOWER('%s')", search_term);
         }
         else if (choice == 4){
-            System.out.print("ISBN: ");
             search_term = Long.toString(scan_isbn("ISBN: "));
             cmd = String.format("SELECT * FROM product " +
                     "INNER JOIN book ON product.pid = book.pid " +
@@ -547,7 +546,6 @@ public class Main {
             {
                 System.out.print(prompt);
                 String x = scanner.nextLine();
-                System.out.println();
                 isbn = normalizeISBN(x);
                 got = true;
             }
@@ -570,7 +568,6 @@ public class Main {
             {
                 System.out.print(prompt);
                 target = scanner.nextDouble();
-                System.out.println();
                 scanner.nextLine();
                 got = true;
             }
