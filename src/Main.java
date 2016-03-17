@@ -1,5 +1,6 @@
 import java.sql.*;
 import java.text.ParseException;
+import java.util.InputMismatchException;
 import java.util.Scanner;
 import java.util.Date;
 import java.text.SimpleDateFormat;
@@ -30,9 +31,7 @@ public class Main {
             System.out.println("4. Submit Restock Order.");
             System.out.println("5. Daily Sales Manifest.\n");
             System.out.println("6. Quit\n");
-            System.out.print("> ");
-            choice = scanner.nextInt();
-            scanner.nextLine();
+            choice = scan_int("> ");
 
             if (choice == 1)
             {
@@ -100,9 +99,9 @@ public class Main {
     //Draws menu and interactively collects data for adding a book.
     public static void addBook(Connection con) throws SQLException
     {
-        String isbn, publisher, author, title, category;
+        String publisher, author, title, category;
         long id, qty;
-        float price;
+        double price;
 
         System.out.print("Title: ");
         title = scanner.nextLine();
@@ -112,16 +111,9 @@ public class Main {
         publisher = scanner.nextLine();
         System.out.print("Category: ");
         category = scanner.nextLine();
-        System.out.print("ISBN: ");
-        isbn = scanner.nextLine();
-        System.out.print("Price: ");
-        price = scanner.nextFloat();
-        System.out.print("Quantity: ");
-        qty = scanner.nextInt();
-        scanner.nextLine();
-
-        //Remove any non numbers from isbn (dashes)
-        id = normalizeISBN(isbn);
+        id = scan_isbn("ISBN: ");
+        price = scan_double("Price: ");
+        qty = scan_int("Quantity: ");
 
         Statement stmt = con.createStatement();
 
@@ -185,9 +177,7 @@ public class Main {
             System.out.println("3. Publisher.");
             System.out.println("4. ISBN");
             System.out.println("5. Go back.\n");
-            System.out.print("> ");
-            choice = scanner.nextInt();
-            scanner.nextLine();
+            choice = scan_int("> ");
         } while (choice > 5 || choice < 1);
 
         String cmd;
@@ -217,8 +207,7 @@ public class Main {
         }
         else if (choice == 4){
             System.out.print("ISBN: ");
-            String inpt = scanner.nextLine();
-            search_term = Long.toString(normalizeISBN(inpt));
+            search_term = Long.toString(scan_isbn("ISBN: "));
             cmd = String.format("SELECT * FROM product " +
                     "INNER JOIN book ON product.pid = book.pid " +
                     "WHERE product.pid=%s", search_term);
@@ -271,18 +260,14 @@ public class Main {
             System.out.println("2. Author's Work.");
             System.out.println("3. Category.");
             System.out.println("4. Go back.\n");
-            System.out.print("> ");
-            choice = scanner.nextInt();
-            scanner.nextLine();
+            choice = scan_int("> ");
         } while (choice > 4 || choice < 1);
 
         //Get choice (ISBN, author, category) and confirm it exists.
         String search_term;
         if (choice == 1)
         {
-            System.out.print("ISBN: ");
-            String inpt = scanner.nextLine();
-            search_term = Long.toString(normalizeISBN(inpt));
+            search_term = Long.toString(scan_isbn("ISBN: "));
             cmd = String.format("SELECT * FROM product " +
                     "INNER JOIN book ON product.pid = book.pid " +
                     "WHERE product.pid=%s", search_term);
@@ -326,23 +311,17 @@ public class Main {
             System.out.println("1. Percent");
             System.out.println("2. Dollar Amount");
             System.out.println("3. Go back.\n");
-            System.out.print("> ");
-            choice = scanner.nextInt();
-            scanner.nextLine();
+            choice = scan_int("> ");
         } while (choice > 3 || choice < 1);
 
         String prct="", amnt="";
         if (choice == 1)
         {
-            System.out.print("Percent: ");
-            prct = String.valueOf(scanner.nextInt());
-            scanner.nextLine();
+            prct = String.valueOf(scan_int("Percent: "));
         }
         else if(choice == 2)
         {
-            System.out.print("Amount: ");
-            amnt = String.valueOf(scanner.nextInt());
-            scanner.nextLine();
+            amnt = String.valueOf(scan_int("Amount: "));
         }
 
         //Get expiry date of Discount (lazily assuming discounts go into effect today.)
@@ -456,9 +435,7 @@ public class Main {
     public static void restock(Connection con) throws SQLException
     {
         Statement stmt = con.createStatement();
-        System.out.print("Input employee ID: ");
-        int eid = scanner.nextInt();
-        scanner.nextLine();
+        int eid = scan_int("Input employee ID: ");
 
         //Check if employee ID exists.
         String emp_search = String.format(
@@ -472,9 +449,7 @@ public class Main {
         }
 
         //Check that book exists.
-        System.out.print("Input ISBN of book to restock: ");
-        String isbn = scanner.nextLine();
-        long id = normalizeISBN(isbn);
+        long id = scan_isbn("Input ISBN of book to restock: ");
 
         String book_search = String.format(
                 "SELECT * FROM book " +
@@ -487,9 +462,7 @@ public class Main {
         }
 
         //Find out qty to restock.
-        System.out.print("Order qty: ");
-        int order_qty = scanner.nextInt();
-        scanner.nextLine();
+        int order_qty = scan_int("Order qty: ");
 
         //Make the restock happen.
         String restocks = String.format(
@@ -535,9 +508,80 @@ public class Main {
         stmt.close();
     }
 
-    private static long normalizeISBN(String isbn){
+    private static long normalizeISBN(String isbn) throws NumberFormatException
+    {
         isbn = isbn.replaceAll("[^\\d.]", "");
         return Long.parseLong(isbn);
+    }
+
+    private static int scan_int(String prompt)
+    {
+        boolean got = false;
+        int x = 0;
+        while(!got)
+        {
+            try
+            {
+                System.out.print(prompt);
+                x = scanner.nextInt();
+                scanner.nextLine();
+                got = true;
+            }
+            catch (InputMismatchException e)
+            {
+                scanner.nextLine();
+                System.out.println("\nERROR: Input must be an integral number.\n");
+                got = false;
+            }
+        }
+        return x;
+    }
+
+    private static long scan_isbn(String prompt)
+    {
+        boolean got = false;
+        long isbn = 0;
+        while(!got)
+        {
+            try
+            {
+                System.out.print(prompt);
+                String x = scanner.nextLine();
+                System.out.println();
+                isbn = normalizeISBN(x);
+                got = true;
+            }
+            catch (NumberFormatException e)
+            {
+                System.out.println("ERROR: ISBN must contain some numbers(e.g. 143-2334-12)\n");
+                got = false;
+            }
+        }
+        return isbn;
+    }
+
+    private static double scan_double(String prompt)
+    {
+        boolean got = false;
+        double target = 0.0;
+        while(!got)
+        {
+            try
+            {
+                System.out.print(prompt);
+                target = scanner.nextDouble();
+                System.out.println();
+                scanner.nextLine();
+                got = true;
+            }
+            catch (InputMismatchException e)
+            {
+                scanner.nextLine();
+                System.out.println("\nERROR: Input must be a floating point number.\n");
+                got = false;
+            }
+        }
+        return target;
     }
 
 }
